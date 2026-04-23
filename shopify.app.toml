@@ -2,7 +2,7 @@
 
 client_id = "71dde0920e4a545a0948152ac249cb55"
 name = "The New Waskat App"
-application_url = "https://example.com"
+application_url = "https://waskatapp-production.up.railway.app"
 embedded = true
 
 [build]
@@ -25,7 +25,7 @@ api_version = "2026-07"
 scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,read_analytics,write_discounts,read_discounts"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://waskatapp-production.up.railway.app/api/auth" ]
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
