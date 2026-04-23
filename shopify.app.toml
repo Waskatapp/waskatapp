@@ -1,13 +1,12 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "71dde0920e4a545a0948152ac249cb55"
-name = "The New Waskat App"
+client_id = "e11e17b6ee2a0f800ad26c79a3e2a92c"
+name = "Waskat app"
 application_url = "https://waskatapp-production.up.railway.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-07"
