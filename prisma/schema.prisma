@@ -1,0 +1,157 @@
+// Prisma schema for Waskat Shopbot.
+// See CLAUDE.md §7 for the canonical model descriptions.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STORE_OWNER
+  STORE_ADMIN
+  VIEW_ONLY
+}
+
+enum MemoryCategory {
+  BRAND_VOICE
+  PRICING_RULES
+  PRODUCT_RULES
+  CUSTOMER_RULES
+  STORE_CONTEXT
+  OPERATOR_PREFS
+}
+
+enum PendingActionStatus {
+  PENDING
+  APPROVED
+  EXECUTED
+  REJECTED
+}
+
+// Shopify OAuth sessions. Shape required by @shopify/shopify-app-session-storage-prisma.
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// Tenant root. One row per connected Shopify store. accessToken stored AES-256-GCM encrypted.
+model Store {
+  id            String    @id @default(cuid())
+  shopDomain    String    @unique
+  accessToken   String
+  scope         String?
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  conversations  Conversation[]
+  pendingActions PendingAction[]
+  storeMemories  StoreMemory[]
+  auditLogs      AuditLog[]
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  userRole  UserRole @default(STORE_OWNER)
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([storeId, userId, updatedAt])
+}
+
+// content is the exact Anthropic ContentBlock[] array — never translate it.
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        Json
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// One row per write tool call. toolCallId is unique — idempotency prevents double-execution.
+model PendingAction {
+  id             String              @id @default(cuid())
+  storeId        String
+  conversationId String
+  toolCallId     String              @unique
+  toolName       String
+  toolInput      Json
+  beforeSnapshot Json?
+  afterSnapshot  Json?
+  status         PendingActionStatus @default(PENDING)
+  requestedBy    String
+  createdAt      DateTime            @default(now())
+  decidedAt      DateTime?
+  executedAt     DateTime?
+  errorMessage   String?
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+  @@index([conversationId])
+}
+
+model StoreMemory {
+  id        String         @id @default(cuid())
+  storeId   String
+  category  MemoryCategory
+  key       String
+  value     String
+  source    String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId, category, updatedAt])
+}
+
+// Immutable. before/after snapshots of every executed write. Never deleted.
+model AuditLog {
+  id           String   @id @default(cuid())
+  storeId      String
+  userId       String
+  userRole     UserRole
+  action       String
+  toolCallId   String?
+  before       Json?
+  after        Json?
+  success      Boolean
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+  @@index([storeId, action, createdAt])
+}
